@@ -35,4 +35,9 @@ class Collaborators extends Model
         $this->attributes['ruc'] = bcrypt($value);
     }
 
+    public function tasks()
+    {
+        // return $this->hasMany(Tasks::class);
+        return $this->belongsTo(Tasks::class);
+    }
 }

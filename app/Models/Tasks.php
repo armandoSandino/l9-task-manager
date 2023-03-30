@@ -32,4 +32,10 @@ class Tasks extends Model
         'updated_at'
     ];
 
+    //protected $with = ['collaborator']; // or implement load() method in query
+    protected $withCount = ['collaborator'];
+
+    public function collaborator() {
+        return $this->hasOne(Collaborators::class, 'id', 'collaborator_id');
+    }
 }
