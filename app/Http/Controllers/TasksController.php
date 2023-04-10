@@ -6,63 +6,61 @@ use Illuminate\Http\Request;
 use App\Models\Collaborators;
 use App\Models\Tasks;
 use Illuminate\Console\View\Components\Task;
+use Symfony\Component\Console\Input\Input;
 use Validator;
+use Illuminate\Support\Collection;
+use Carbon\Carbon;
 
 class TasksController extends Controller
 {
-    /*
-    public function sendResponse( $result, $message ){
-        $response = [
-            'success' => true,
-            'data' => $result,
-            'message' => $message
-        ];
-        return response()->json( $response, 200 );
-    }
-
-    public function sendError( $error, $errorMessages = [], $code = 404 ){
-        $response = [
-            'success' => false,
-            'message' => $error
-        ];
-
-        if( !empty($errorMessages) ) {
-            $response['data'] = $errorMessages;
-        }
-        return response()->json( $response, $code );
-    }
-    */
-
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        
-        $products = Tasks::all();
+
+        $listTasks = Tasks::all();
         $input = $request->all();
 
         $validator = Validator::make($input, [
-            'sorted' => ''
+            'sorted_by' => ''
         ]);
 
-        if ( $validator->fails() ){
-            return response()->json( $validator->errors(), 422 );
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
         }
 
-        if ( !empty( $input ) ) {
+
+        if (!empty($input)) {
+
             // filters
             $tasks = Tasks::where('deleted_at', null)
-            ->orderBy('id', 'desc')
-            ->limit( 1000 )
-            ->get();
+                ->where('collaborator_id', $input['collaborator'])
+                ->where('state', $input['state'])
+                ->where('priority', $input['priority'])
+                ->orderBy('startDate', 'asc')
+                ->limit(1000)
+                ->get();
+            $collection = collect();
+            $tasks->load(['collaborator'])->each(function ($item, $key) use ($collection, $input) {
 
-            $data = $tasks->load(['collaborator']);
+                // m/d/y
+                // $startDateSource = Carbon::createFromFormat('Y/m/d', $item['startDate'] )->format('Y-m-d');
+                $startDateSource = Carbon::parse($item['startDate']);
+                $endDateSource = Carbon::parse($item['endDate']);
+                $startDateTarget = Carbon::parse($input['startDate']);
+                $endDateTarget = Carbon::parse($input['endDate']);
 
-            return response()->json( ['data'=> $data ], 200 );
+                if ($startDateTarget->gte($startDateSource)) {
+                    if ($startDateSource->lte($endDateTarget)) {
+                        $collection->push($item);
+                    }
+                }
+            });
+
+            return response()->json(['data' => $collection->all()], 200);
         } else {
-            
-            return response()->json( ['data' => $products->load(['collaborator'])], 200 );
+            return response()->json(['data' => $listTasks->load(['collaborator'])], 200);
         }
     }
 
@@ -80,23 +78,22 @@ class TasksController extends Controller
     public function store(Request $request)
     {
         $input = $request->all();
-        $validator = Validator::make( $input, [
+        $validator = Validator::make($input, [
             'description' => 'required|string',
             'collaborator_id' => 'integer',
             'state' => 'required|in:PENDIENTE,PROCESO,FINALIZADA',
-            'priority'=> 'required|in:ALTA,MEDIA,BAJA',
-            'startDate'=>'required',
-            'endDate'=>'required',
-            'notes' => 'string'
+            'priority' => 'required|in:ALTA,MEDIA,BAJA',
+            'startDate' => 'required',
+            'endDate' => 'required',
         ]);
 
-        if ( $validator->fails() ){
-            return response()->json( $validator->errors(), 422 );
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
         }
-        
-        $task = Tasks::create( $input );
 
-        return response()->json( ['data'=> $task ] , 201 );
+        $task = Tasks::create($input);
+
+        return response()->json(['data' => $task], 201);
     }
 
     /**
@@ -104,9 +101,9 @@ class TasksController extends Controller
      */
     public function show(string $id)
     {
-        $task = Tasks::findOrFail( intval($id) )->load('collaborator');
+        $task = Tasks::findOrFail(intval($id))->load('collaborator');
 
-        return response()->json( ['data' => $task ], 200 );
+        return response()->json(['data' => $task], 200);
     }
 
     /**
@@ -123,33 +120,32 @@ class TasksController extends Controller
     public function update(Request $request, string $id)
     {
         $input = $request->all();
-        $validator = Validator::make( $input, [
+        $validator = Validator::make($input, [
             'description' => 'required|string',
             'collaborator_id' => 'required|integer|exists:collaborators,id',
             'state' => 'required|in:PENDIENTE,PROCESO,FINALIZADA',
-            'priority'=> 'required|in:ALTA,MEDIA,BAJA',
-            'startDate'=>'required',
-            'endDate'=>'required',
-            'notes' => 'string'
+            'priority' => 'required|in:ALTA,MEDIA,BAJA',
+            'startDate' => 'required',
+            'endDate' => 'required',
         ]);
 
-        if ( $validator->fails() ){
-            return response()->json( $validator->errors(), 422 );
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
         }
 
         $task = Tasks::updateOrCreate([
-            'id' => intVal( $id )
-        ],[
+            'id' => intVal($id)
+        ], [
             'description' => $input['description'],
             'collaborator_id' => $input['collaborator_id'],
             'state' => $input['state'],
-            'priority'=> $input['priority'],
-            'startDate'=> $input['startDate'],
-            'endDate'=> $input['endDate'],
-            'notes' => !isset($input['notes']) ? null : $input['notes'] 
+            'priority' => $input['priority'],
+            'startDate' => $input['startDate'],
+            'endDate' => $input['endDate'],
+            'notes' => !isset($input['notes']) ? null : $input['notes']
         ]);
 
-        return response()->json( ['data'=> $task] , 200 );
+        return response()->json(['data' => $task], 200);
     }
 
     /**
@@ -158,9 +154,9 @@ class TasksController extends Controller
     public function destroy(string $id)
     {
         $task = Tasks::findOrFail($id)
-        ->delete();
+            ->delete();
 
-        $foundTask = Tasks::withTrashed()->findOrFail( $id );
-        return response()->json( ['data'=> $foundTask ] , 200 );
+        $foundTask = Tasks::withTrashed()->findOrFail($id);
+        return response()->json(['data' => $foundTask], 200);
     }
 }

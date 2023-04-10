@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CollaboratorController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TasksController;
@@ -21,5 +22,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 //Route::resource('tasks', [TasksController::class] );
 Route::resources([
-    'tasks' => TasksController::class
+    'tasks' => TasksController::class,
+    'collaborators' => CollaboratorController::class
 ]);
